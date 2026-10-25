@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Выбор карт</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Philosopher:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07041a;
+    --line: #f4ecff;
+    --glow: 124, 72, 255;
+    --card-w: min(calc((100vw - 32px - 3 * 12px) / 4), 92px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: #fff;
+    font-family: 'Philosopher', Georgia, serif;
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  }
+
+  /* --- Небо: неоновые пятна, волны, искры --- */
+  .sky {
+    position: fixed; inset: 0; overflow: hidden; z-index: 0;
+    background: radial-gradient(130% 80% at 50% 115%, #2b0f70 0%, #13063a 45%, var(--bg) 78%);
+  }
+  .blob {
+    position: absolute; border-radius: 50%; filter: blur(60px); opacity: .5;
+    mix-blend-mode: screen; animation: drift 18s ease-in-out infinite alternate;
+  }
+  .b1 { width: 80vmax; height: 38vmax; left: -30vmax; top: 34%; background: #5a1fff; }
+  .b2 { width: 70vmax; height: 34vmax; right: -32vmax; top: 58%; background: #1f44ff; animation-duration: 23s; }
+  .b3 { width: 55vmax; height: 28vmax; left: 15%; top: -14%; background: #a01cff; opacity: .3; animation-duration: 27s; }
+  @keyframes drift {
+    from { transform: translate(0, 0) rotate(0deg) scale(1); }
+    to   { transform: translate(9vmax, -7vmax) rotate(22deg) scale(1.15); }
+  }
+  .waves { position: absolute; left: -10%; width: 120%; top: 30%; height: 70%; opacity: .55; animation: sway 14s ease-in-out infinite alternate; }
+  @keyframes sway {
+    from { transform: translateY(0) rotate(-3deg); }
+    to   { transform: translateY(-4%) rotate(3deg); }
+  }
+  .spark {
+    position: absolute; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 6px 1px rgba(var(--glow), .9);
+    animation: twinkle var(--t, 4s) ease-in-out infinite, rise var(--r, 30s) linear infinite;
+  }
+  @keyframes twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+  @keyframes rise { from { transform: translateY(0); } to { transform: translateY(-40px); } }
+
+  /* --- Сцена --- */
+  main {
+    position: relative; z-index: 1;
+    min-height: var(--tg-viewport-stable-height, 100dvh);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  .title {
+    font-size: 26px; font-weight: 700; letter-spacing: .3px; white-space: nowrap;
+    padding: 10px 28px; border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 999px;
+    background: rgba(12, 6, 36, .35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    text-shadow: 0 0 14px rgba(var(--glow), .9);
+    box-shadow: 0 0 22px rgba(var(--glow), .25), inset 0 0 18px rgba(var(--glow), .15);
+    transition: opacity .35s;
+  }
+  .hint { margin-top: -16px; font-size: 15px; opacity: .7; min-height: 1.2em; transition: opacity .35s; }
+
+  .table {
+    display: flex; flex-wrap: wrap-reverse; justify-content: center;
+    gap: 16px 12px; max-width: calc(var(--card-w) * 4 + 12px * 3);
+  }
+  .slot {
+    display: flex; flex-direction: column; align-items: center; width: var(--card-w);
+    transition: width .5s cubic-bezier(.2, .8, .2, 1), opacity .45s, transform .45s;
+  }
+  .card {
+    position: relative; width: 100%; aspect-ratio: 240 / 414;
+    padding: 0; border: 0; background: none; cursor: pointer; perspective: 900px;
+    animation: deal .7s cubic-bezier(.2, .8, .2, 1) backwards, bob 5s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 90ms), calc(var(--i) * -700ms);
+  }
+  @keyframes deal { from { opacity: 0; transform: translateY(40px) scale(.85); } }
+  @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+  .card:focus-visible { outline: 2px solid #fff; outline-offset: 4px; border-radius: 8px; }
+
+  .inner {
+    position: absolute; inset: 0; transform-style: preserve-3d;
+    transition: transform .9s cubic-bezier(.3, 1.3, .4, 1);
+  }
+  .card.flipped .inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: 8px; overflow: hidden;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .back {
+    color: var(--line);
+    background: radial-gradient(90% 60% at 50% 50%, #241066 0%, #0e0730 70%);
+    box-shadow: 0 0 16px rgba(var(--glow), .45);
+    transition: box-shadow .3s;
+  }
+  .back svg { width: 100%; height: 100%; display: block; }
+  .card:not(.flipped):active .back { box-shadow: 0 0 26px rgba(var(--glow), .95); }
+  .front {
+    transform: rotateY(180deg); background: #f1e9d6;
+    box-shadow: 0 0 22px rgba(var(--glow), .8), 0 0 2px #fff;
+  }
+  .front img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .front.reversed img { transform: rotate(180deg); }
+
+  /* Подпись стоит в потоке под картой, поэтому сама отодвигает кнопку «Продолжить» */
+  .caption {
+    display: none; flex-direction: column; justify-content: center; flex-grow: 1;
+    align-self: stretch; margin: 12px 0 0; padding: 7px 4px; overflow: hidden;
+    text-align: center; font-size: 15px; font-weight: 700; line-height: 1.2; color: #fff;
+    background: rgba(9, 4, 30, .72); border: 1px solid rgba(255, 255, 255, .22); border-radius: 10px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .7);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+    animation: fade-up .45s .6s backwards;  /* появляется после подгонки шрифта */
+  }
+  .caption small { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; font-style: italic; color: #d9c8ff; }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(6px); } }
+
+  /* Карты выбраны: остальные исчезают, выбранные выстраиваются в ряд */
+  .table.closing .slot:not(.picked) { opacity: 0; transform: scale(.7); pointer-events: none; }
+  .table.revealed { flex-wrap: wrap; gap: 22px 10px; max-width: none; }
+  .table.revealed .slot { --card-w: min(calc((100vw - 32px - 2 * 10px) / 3), 108px); }
+  .table.revealed .card { animation: none; cursor: default; }
+  .table.revealed .caption { display: flex; }
+
+  .go {
+    font: 700 21px 'Philosopher', Georgia, serif; color: #fff;
+    padding: 14px 38px; border: 0; border-radius: 999px; cursor: pointer;
+    background: linear-gradient(100deg, #2f2ad6, #7a2be0 60%, #a630d8);
+    box-shadow: 0 0 24px rgba(var(--glow), .7), inset 0 1px 0 rgba(255, 255, 255, .3);
+    opacity: 0; transform: translateY(16px); pointer-events: none;
+    transition: opacity .5s, transform .5s;
+  }
+  .go.show { opacity: 1; transform: none; pointer-events: auto; }
+  .go:active { transform: scale(.97); }
+
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 2;
+    padding: 12px 14px; border-radius: 12px; font: 13px/1.4 system-ui, sans-serif;
+    background: rgba(20, 10, 50, .92); border: 1px solid rgba(255, 255, 255, .25); display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .waves, .spark, .card { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <svg class="waves" id="waves" viewBox="0 0 400 300" preserveAspectRatio="none"></svg>
+</div>
+
+<main>
+  <div class="title" id="title">Выберите 3 карты:</div>
+  <div class="hint" id="hint">Сосредоточьтесь на своём вопросе</div>
+  <div class="table" id="table"></div>
+  <button class="go" id="go" type="button">Продолжить</button>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+// Порядок совпадает с DECK в tarot.py; картинки лежат в cards/00.jpg … cards/77.jpg
+const DECK = ["Шут", "Маг", "Верховная Жрица", "Императрица", "Император", "Иерофант", "Влюблённые", "Колесница", "Сила", "Отшельник", "Колесо Фортуны", "Справедливость", "Повешенный", "Смерть", "Умеренность", "Дьявол", "Башня", "Звезда", "Луна", "Солнце", "Суд", "Мир", "Туз Жезлов", "Двойка Жезлов", "Тройка Жезлов", "Четвёрка Жезлов", "Пятёрка Жезлов", "Шестёрка Жезлов", "Семёрка Жезлов", "Восьмёрка Жезлов", "Девятка Жезлов", "Десятка Жезлов", "Паж Жезлов", "Рыцарь Жезлов", "Королева Жезлов", "Король Жезлов", "Туз Кубков", "Двойка Кубков", "Тройка Кубков", "Четвёрка Кубков", "Пятёрка Кубков", "Шестёрка Кубков", "Семёрка Кубков", "Восьмёрка Кубков", "Девятка Кубков", "Десятка Кубков", "Паж Кубков", "Рыцарь Кубков", "Королева Кубков", "Король Кубков", "Туз Мечей", "Двойка Мечей", "Тройка Мечей", "Четвёрка Мечей", "Пятёрка Мечей", "Шестёрка Мечей", "Семёрка Мечей", "Восьмёрка Мечей", "Девятка Мечей", "Десятка Мечей", "Паж Мечей", "Рыцарь Мечей", "Королева Мечей", "Король Мечей", "Туз Пентаклей", "Двойка Пентаклей", "Тройка Пентаклей", "Четвёрка Пентаклей", "Пятёрка Пентаклей", "Шестёрка Пентаклей", "Семёрка Пентаклей", "Восьмёрка Пентаклей", "Девятка Пентаклей", "Десятка Пентаклей", "Паж Пентаклей", "Рыцарь Пентаклей", "Королева Пентаклей", "Король Пентаклей"];
+const REVERSED_CHANCE = 0.35;
+
+const tg = window.Telegram && window.Telegram.WebApp;
+const inTelegram = Boolean(tg && tg.platform && tg.platform !== 'unknown');
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor && tg.setHeaderColor('#07041a');
+  tg.setBackgroundColor && tg.setBackgroundColor('#07041a');
+}
+const haptic = (kind) => {
+  try {
+    if (kind === 'success') tg.HapticFeedback.notificationOccurred('success');
+    else tg.HapticFeedback.impactOccurred(kind);
+  } catch (e) { /* вне Telegram отдачи нет */ }
+};
+
+const params = new URLSearchParams(location.search);
+const need = Math.min(10, Math.max(1, parseInt(params.get('n'), 10) || 3));
+const tableSize = Math.max(7, need + 4);
+
+function randInt(n) {
+  const a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return a[0] % n;
+}
+function plural(n, one, few, many) {
+  if (n % 10 === 1 && n % 100 !== 11) return one;
+  if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) return few;
+  return many;
+}
+
+// --- Фон: волны и искры ---
+(function drawSky() {
+  const svg = document.getElementById('waves');
+  const ns = 'http://www.w3.org/2000/svg';
+  svg.innerHTML = `<defs><linearGradient id="wg" x1="0" x2="1">
+      <stop offset="0" stop-color="#3b5bff" stop-opacity="0"/>
+      <stop offset=".35" stop-color="#7b4dff"/>
+      <stop offset=".7" stop-color="#c14dff"/>
+      <stop offset="1" stop-color="#3b5bff" stop-opacity="0"/></linearGradient></defs>`;
+  for (let i = 0; i < 18; i++) {
+    const y = 90 + i * 7, a = 40 + i * 3;
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', `M0 ${y} C 110 ${y - a}, 190 ${y + a}, 260 ${y - a * .3} S 380 ${y - a * .8}, 400 ${y - 10}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'url(#wg)');
+    path.setAttribute('stroke-width', '0.8');
+    path.setAttribute('opacity', (0.12 + (i % 5) * 0.05).toFixed(2));
+    svg.appendChild(path);
+  }
+  const sky = document.querySelector('.sky');
+  for (let i = 0; i < 28; i++) {
+    const s = document.createElement('div');
+    const size = 1.5 + Math.random() * 3;
+    s.className = 'spark';
+    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random() * 100}%;top:${Math.random() * 100}%;` +
+      `--t:${3 + Math.random() * 4}s;--r:${20 + Math.random() * 30}s;animation-delay:${-Math.random() * 6}s,0s`;
+    sky.appendChild(s);
+  }
+})();
+
+// --- Рубашка карты: глаз в лучах, луна и звезда ---
+function cardBack() {
+  let rays = '';
+  for (let k = 0; k < 24; k++) {
+    const ang = k * Math.PI / 12, r1 = 15.5, r2 = k % 2 ? 19 : 22.5;
+    rays += `<line x1="${(30 + r1 * Math.cos(ang)).toFixed(2)}" y1="${(52 + r1 * Math.sin(ang)).toFixed(2)}" ` +
+            `x2="${(30 + r2 * Math.cos(ang)).toFixed(2)}" y2="${(52 + r2 * Math.sin(ang)).toFixed(2)}"/>`;
+  }
+  const sparkle = (x, y, r) => `<path fill="currentColor" stroke="none" d="M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z"/>`;
+  return `<svg viewBox="0 0 60 104" fill="none" stroke="currentColor" stroke-width=".8" stroke-linecap="round">
+    <rect x="2.5" y="2.5" width="55" height="99" rx="4"/>
+    <rect x="5.5" y="5.5" width="49" height="93" rx="2.5" stroke-width=".5" opacity=".8"/>
+    ${sparkle(10.5, 10.5, 2.4)}${sparkle(49.5, 10.5, 2.4)}${sparkle(10.5, 93.5, 2.4)}${sparkle(49.5, 93.5, 2.4)}
+    <circle cx="30" cy="52" r="13.5" stroke-width=".6"/>
+    ${rays}
+    <path d="M20 52Q30 43.5 40 52Q30 60.5 20 52Z"/>
+    <circle cx="30" cy="52" r="4"/>
+    <circle cx="30" cy="52" r="1.7" fill="currentColor"/>
+    <path d="M33.2 16.5a6 6 0 1 0 0 10.6a4.6 4.6 0 1 1 0-10.6Z" stroke-width=".7"/>
+    ${sparkle(30, 87, 3.6)}
+    <circle cx="30" cy="31.5" r=".8" fill="currentColor" stroke="none"/>
+    <circle cx="30" cy="77" r=".8" fill="currentColor" stroke="none"/>
+  </svg>`;
+}
+
+// --- Колода: перемешиваем и раскладываем рубашкой вверх ---
+const order = DECK.map((_, i) => i);
+for (let i = order.length - 1; i > 0; i--) {
+  const j = randInt(i + 1);
+  [order[i], order[j]] = [order[j], order[i]];
+}
+const slots = order.slice(0, tableSize).map((index) => ({ index, reversed: randInt(1000) < REVERSED_CHANCE * 1000 }));
+
+const titleEl = document.getElementById('title');
+const hintEl = document.getElementById('hint');
+const table = document.getElementById('table');
+const goBtn = document.getElementById('go');
+titleEl.textContent = `Выберите ${need} ${plural(need, 'карту', 'карты', 'карт')}:`;
+
+const picked = [];
+let done = false;
+const back = cardBack();
+
+slots.forEach((slot, i) => {
+  const wrap = document.createElement('div');
+  wrap.className = 'slot';
+  wrap.style.setProperty('--i', i);
+  wrap.innerHTML = `<button type="button" class="card" aria-label="Карта рубашкой вверх">
+      <div class="inner">
+        <div class="face back">${back}</div>
+        <div class="face front${slot.reversed ? ' reversed' : ''}"><img src="cards/${String(slot.index).padStart(2, '0')}.jpg" alt=""></div>
+      </div>
+    </button>
+    <div class="caption">${DECK[slot.index]}${slot.reversed ? '<small>перевёрнутая</small>' : ''}</div>`;
+  const card = wrap.querySelector('.card');
+  card.addEventListener('click', () => {
+    if (done || card.classList.contains('flipped')) return;
+    picked.push(slot);
+    wrap.classList.add('picked');
+    card.classList.add('flipped');
+    card.setAttribute('aria-label', DECK[slot.index] + (slot.reversed ? ', перевёрнутая' : ''));
+    haptic('medium');
+    hintEl.textContent = `Выбрано: ${picked.length} из ${need}`;
+    if (picked.length === need) {
+      done = true;
+      setTimeout(reveal, 1100);
+    }
+  });
+  slot.el = wrap;
+  table.appendChild(wrap);
+});
+
+function reveal() {
+  table.classList.add('closing');
+  titleEl.style.opacity = 0;
+  hintEl.style.opacity = 0;
+  setTimeout(() => {
+    slots.filter((s) => !picked.includes(s)).forEach((s) => s.el.remove());
+    picked.forEach((s) => table.appendChild(s.el));  // в порядке выбора
+    table.classList.remove('closing');
+    table.classList.add('revealed');
+    titleEl.textContent = need === 1 ? 'Ваша карта:' : 'Ваши карты:';
+    titleEl.style.opacity = 1;
+    hintEl.textContent = '';
+    goBtn.classList.add('show');
+    haptic('success');
+    setTimeout(fitCaptions, 520);  // после того как карты доросли до итоговой ширины
+  }, 480);
+}
+
+// Подпись не шире карты: уменьшаем шрифт, пока самое длинное слово не влезет,
+// и ставим всем подписям одинаковый размер
+function fitCaptions() {
+  const captions = picked.map((s) => s.el.querySelector('.caption'));
+  let size = 15;
+  const overflows = () => captions.some((c) => c.scrollWidth > c.clientWidth);
+  captions.forEach((c) => { c.style.fontSize = size + 'px'; });
+  while (overflows() && size > 10) {
+    size -= 0.5;
+    captions.forEach((c) => { c.style.fontSize = size + 'px'; });
+  }
+}
+
+goBtn.addEventListener('click', () => {
+  const data = JSON.stringify({ cards: picked.map((s) => [s.index, s.reversed ? 1 : 0]) });
+  if (inTelegram) {
+    tg.sendData(data);  // Telegram закроет окно и передаст карты боту
+    return;
+  }
+  const toast = document.getElementById('toast');
+  toast.textContent = 'Предпросмотр вне Telegram. Боту ушло бы: ' + data;
+  toast.style.display = 'block';
+});
+</script>
+</body>
+</html>
